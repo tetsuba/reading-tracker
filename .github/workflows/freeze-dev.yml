@@ -1,0 +1,46 @@
+name: Freeze Gate (develop)
+
+on:
+  pull_request:
+    branches: [ dev ]
+
+jobs:
+  freeze:
+    name: Block PRs into develop during release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check override label
+        id: labels
+        run: |
+          # Collect PR labels from event payload
+          LABELS=$(jq -r '.pull_request.labels[].name' < "$GITHUB_EVENT_PATH" || true)
+          echo "labels=$LABELS" >> "$GITHUB_OUTPUT"
+
+      - name: Fail if release freeze is active
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          LABELS: ${{ steps.labels.outputs.labels }}
+        run: |
+          # If an override label is present, skip freeze (optional)
+          OVERRIDE_LABEL="release-freeze-exempt"
+          if echo "$LABELS" | grep -q "^${OVERRIDE_LABEL}$"; then
+            echo "Override label '${OVERRIDE_LABEL}' present. Skipping freeze."
+            exit 0
+          fi
+
+          # Query all branches that start with release/
+          # Using the matching-refs API for efficient prefix search
+          MATCHING=$(gh api repos/$REPO/git/matching-refs/heads/release/ || echo "[]")
+          COUNT=$(echo "$MATCHING" | jq 'length')
+
+          echo "Found $COUNT release/* branches."
+          if [ "$COUNT" -gt 0 ]; then
+            echo "A release branch exists. Freezing merges into develop."
+            exit 1
+          fi
+
+          echo "No release branch found. Merges into develop are allowed."
