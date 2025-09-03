@@ -29,8 +29,6 @@ export const queryClient = new QueryClient({
     }
 })
 
-// Add a comment to test git work flow freeze dev
-
 function App() {
     setupAxiosInterceptors(store)
     return (
