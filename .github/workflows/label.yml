@@ -1,7 +1,7 @@
 name: PR Labeler
 on:
   pull_request:
-    types: [opened, synchronize]
+    types: [opened]
 
 permissions:
   issues: write
@@ -11,47 +11,45 @@ jobs:
   label-pr:
     runs-on: ubuntu-latest
     steps:
-      - name: Label PR based on target branch
+      - name: Label PR based on target branch and add "not ready to merge"
         uses: actions/github-script@v7
         with:
           script: |
+            const prNumber = context.payload.pull_request.number;
             const targetBranch = context.payload.pull_request.base.ref;
-              let label = '';
+            let label = '';
 
-              if (targetBranch === 'dev') {
-                label = 'feature';
-              } else if (targetBranch === 'main') {
-                label = 'hotfix';
-              } else if (/^release\/[\w.-]+$/.test(targetBranch)) {
-                label = 'bugfix';
-              }
+            if (targetBranch === 'dev') {
+              label = 'feature';
+            } else if (targetBranch === 'main') {
+              label = 'hotfix';
+            } else if (/^release\/[\w.-]+$/.test(targetBranch)) {
+              label = 'bugfix';
+            }
 
-              // Ensure label exists before adding
-              if (label) {
-                try {
-                  await github.rest.issues.addLabels({
+            // List of labels to add
+            const labelsToAdd = ['not ready to merge'];
+            if (label) labelsToAdd.push(label);
+
+            for (const lbl of labelsToAdd) {
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  labels: [lbl]
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  // Label does not exist, instruct the user to create it
+                  await github.rest.issues.createComment({
                     owner: context.repo.owner,
-                    repo: context.repo.repo, // <-- FIXED HERE
-                    issue_number: context.payload.pull_request.number,
-                    labels: [label]
+                    repo: context.repo.repo,
+                    issue_number: prNumber,
+                    body: `Please create the label "${lbl}" in your repository to enable automatic labeling.`
                   });
-                } catch (error) {
-                  if (error.status === 404) {
-                    // Label does not exist, create it then add
-                    await github.rest.issues.createLabel({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo, // <-- FIXED HERE
-                      name: label,
-                      color: 'ededed' // default color
-                    });
-                    await github.rest.issues.addLabels({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo, // <-- FIXED HERE
-                      issue_number: context.payload.pull_request.number,
-                      labels: [label]
-                    });
-                  } else {
-                    throw error;
-                  }
+                } else {
+                  throw error;
                 }
               }
+            }
