@@ -29,7 +29,7 @@ export const queryClient = new QueryClient({
     }
 })
 
-// Dev Update -----------
+// Dev Update ------
 
 function App() {
     setupAxiosInterceptors(store)
