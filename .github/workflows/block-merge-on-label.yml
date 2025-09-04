@@ -1,0 +1,17 @@
+name: Block Merge if "not ready to merge" Label Exists
+on:
+  pull_request:
+    types: [labeled, unlabeled, opened, synchronize]
+
+jobs:
+  block-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if "not ready to merge" label is present
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = context.payload.pull_request.labels.map(l => l.name);
+            if (labels.includes('not ready to merge')) {
+              core.setFailed('This PR cannot be merged while "not ready to merge" label is present.');
+            }
