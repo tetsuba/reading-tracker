@@ -1,0 +1,32 @@
+name: PR Labeler
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  label-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Label PR based on target branch
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const targetBranch = context.payload.pull_request.base.ref;
+            let label = '';
+
+            if (targetBranch === 'dev') {
+              label = 'feature';
+            } else if (targetBranch === 'main') {
+              label = 'hotfix';
+            } else if (/^release\/[\w.-]+$/.test(targetBranch)) {
+              label = 'bugfix';
+            }
+
+            if (label) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.name,
+                issue_number: context.payload.pull_request.number, // <-- Correct property
+                labels: [label]
+              });
+            }
